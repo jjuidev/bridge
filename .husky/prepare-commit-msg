@@ -1,0 +1,2 @@
+#!/bin/sh
+npx devmoji --edit --lint --config ./.commitlintrc.cjs
