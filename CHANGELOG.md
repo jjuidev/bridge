@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.1.0
+
+### Minor Changes
+
+- 4053bb7: Change expiryThreshold, executeRefreshToken
+
 ## 2.0.0
 
 ### Major Changes
