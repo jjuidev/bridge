@@ -72,10 +72,6 @@ export class HttpClient {
 		}
 	}
 
-	public destroy() {
-		this.tokenManager.destroy()
-	}
-
 	// https://github.com/axios/axios
 	public head = <T = any, R = BridgeResponse<T>, D = any>(url: string, config?: AxiosRequestConfig<D>) =>
 		this.instance.head<T, R, D>(url, config)

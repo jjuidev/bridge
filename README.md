@@ -34,17 +34,22 @@ bun add @jjuidev/bridge
 import { HttpClient } from '@jjuidev/bridge'
 
 const httpClient = new HttpClient({
-	baseURL: 'https://api.example.com',
+	baseURL: API_BASE_URL,
 	tokenManagerOptions: {
-		// ⚠️ Use fetch, separate axios instance or httpClient with ignoreTokenPatterns, NOT httpClient to avoid infinite loop
-		ignoreTokenPatterns: [/\/auth\/refresh/],
-		executeRefreshToken: async (refreshToken: string) => {
-			const response = await fetch('https://api.example.com/auth/refresh', {
+		ignoreTokenPatterns: [/\/auth\/login/],
+		executeRefreshToken: async ({ accessToken, refreshToken }) => {
+			const response = await fetch(`${API_BASE_URL}/auth/refresh-token`, {
 				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ refreshToken })
+				body: JSON.stringify({ refreshToken }),
+				headers: {
+					'Content-Type': 'application/json',
+					Authorization: `Bearer ${accessToken}`
+				}
 			})
-			return response.json()
+
+			const data = await response.json()
+
+			return data.data
 		}
 	}
 })
@@ -105,57 +110,25 @@ httpClient.post('/auth/refresh')
   → INFINITE LOOP! 🔄
 ```
 
-**✅ Correct Approaches:**
-
-**Option 1: Use `fetch` directly (Recommended)**
+**✅ Correct Approach: Use `fetch` directly**
 
 ```typescript
 const httpClient = new HttpClient({
-	baseURL: 'https://api.example.com',
+	baseURL: API_BASE_URL,
 	tokenManagerOptions: {
-		executeRefreshToken: async (refreshToken: string) => {
-			const response = await fetch('https://api.example.com/auth/refresh', {
+		executeRefreshToken: async ({ accessToken, refreshToken }) => {
+			const response = await fetch(`${API_BASE_URL}/auth/refresh-token`, {
 				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ refreshToken })
+				body: JSON.stringify({ refreshToken }),
+				headers: {
+					'Content-Type': 'application/json',
+					Authorization: `Bearer ${accessToken}`
+				}
 			})
-			return response.json()
-		}
-	}
-})
-```
 
-**Option 2: Use separate Axios instance**
+			const data = await response.json()
 
-```typescript
-import axios from 'axios'
-
-const refreshAxios = axios.create({
-	baseURL: 'https://api.example.com'
-})
-
-const httpClient = new HttpClient({
-	baseURL: 'https://api.example.com',
-	tokenManagerOptions: {
-		executeRefreshToken: async (refreshToken: string) => {
-			const response = await refreshAxios.post('/auth/refresh', { refreshToken })
-			return response.data
-		}
-	}
-})
-```
-
-**Option 3: Add refresh endpoint to ignoreTokenPatterns**
-
-```typescript
-const httpClient = new HttpClient({
-	baseURL: 'https://api.example.com',
-	ignoreTokenPatterns: [/\/auth\/refresh/], // Skip token for refresh endpoint
-	tokenManagerOptions: {
-		executeRefreshToken: async (refreshToken: string) => {
-			// Now safe to use httpClient since refresh endpoint is in ignoreTokenPatterns
-			const response = await httpClient.post('/auth/refresh', { refreshToken })
-			return response.data
+			return data.data
 		}
 	}
 })
@@ -165,22 +138,28 @@ const httpClient = new HttpClient({
 
 ```typescript
 const httpClient = new HttpClient({
-	baseURL: 'https://api.example.com',
+	baseURL: API_BASE_URL,
 	tokenManagerOptions: {
-		expiryThreshold: 120,
+		expiryThreshold: 120_000, // 120 seconds in milliseconds
 		tokenKey: {
 			accessToken: 'token_access',
 			refreshToken: 'token_refresh'
 		},
 		getAccessToken: () => sessionStorage.getItem('token_access') ?? '',
 		getRefreshToken: () => sessionStorage.getItem('token_refresh') ?? '',
-		executeRefreshToken: async (refreshToken: string) => {
-			const response = await fetch('/auth/refresh', {
+		executeRefreshToken: async ({ accessToken, refreshToken }) => {
+			const response = await fetch(`${API_BASE_URL}/auth/refresh-token`, {
 				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ refreshToken })
+				body: JSON.stringify({ refreshToken }),
+				headers: {
+					'Content-Type': 'application/json',
+					Authorization: `Bearer ${accessToken}`
+				}
 			})
-			return response.json()
+
+			const data = await response.json()
+
+			return data.data
 		}
 	}
 })
@@ -190,27 +169,32 @@ const httpClient = new HttpClient({
 
 ```typescript
 const httpClient = new HttpClient({
-	baseURL: 'https://api.example.com',
+	baseURL: API_BASE_URL,
 	tokenManagerOptions: {
-		executeRefreshToken: async (refreshToken: string) => {
-			// Call your refresh API with the provided refreshToken
-			const response = await fetch('https://api.example.com/auth/refresh', {
+		executeRefreshToken: async ({ accessToken, refreshToken }) => {
+			const response = await fetch(`${API_BASE_URL}/auth/refresh-token`, {
 				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ refreshToken })
+				body: JSON.stringify({ refreshToken }),
+				headers: {
+					'Content-Type': 'application/json',
+					Authorization: `Bearer ${accessToken}`
+				}
 			})
-			return response.json()
+
+			const data = await response.json()
+
+			return data.data
 		},
 		onTokenInvalid: (error) => {
 			console.error('Token invalid:', error)
 			// Handle invalid token (e.g., redirect to login)
 			localStorage.clear()
 		},
-		onRefreshTokenStart: () => {
-			console.log('Starting token refresh...')
+		onBeforeRefreshToken: (currentToken) => {
+			console.log('Starting token refresh with current token:', currentToken)
 		},
-		onRefreshTokenSuccess: (token) => {
-			console.log('Token refreshed:', token)
+		onAfterRefreshToken: (newToken) => {
+			console.log('Token refreshed:', newToken)
 			// Token is automatically saved to localStorage
 			// Or handle custom storage here
 		},
@@ -232,7 +216,7 @@ const httpClient = new HttpClient({
 
 ```typescript
 const httpClient = new HttpClient({
-	baseURL: 'https://api.example.com',
+	baseURL: API_BASE_URL,
 	tokenManagerOptions: {
 		isAccessTokenExpired: (token) => {
 			// Custom logic to check if access token is expired
@@ -244,14 +228,19 @@ const httpClient = new HttpClient({
 			// Return true if expired, false if valid
 			return false
 		},
-		executeRefreshToken: async (refreshToken: string) => {
-			// Custom refresh logic
-			const response = await fetch('/auth/refresh', {
+		executeRefreshToken: async ({ accessToken, refreshToken }) => {
+			const response = await fetch(`${API_BASE_URL}/auth/refresh-token`, {
 				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ refreshToken })
+				body: JSON.stringify({ refreshToken }),
+				headers: {
+					'Content-Type': 'application/json',
+					Authorization: `Bearer ${accessToken}`
+				}
 			})
-			return response.json()
+
+			const data = await response.json()
+
+			return data.data
 		}
 	}
 })
@@ -263,16 +252,22 @@ By default, token is automatically attached to all requests. Use `ignoreTokenPat
 
 ```typescript
 const httpClient = new HttpClient({
-	baseURL: 'https://api.example.com',
+	baseURL: API_BASE_URL,
 	ignoreTokenPatterns: [/\/auth\/login/, /\/auth\/register/, /\/public\//],
 	tokenManagerOptions: {
-		executeRefreshToken: async (refreshToken: string) => {
-			const response = await fetch('/auth/refresh', {
+		executeRefreshToken: async ({ accessToken, refreshToken }) => {
+			const response = await fetch(`${API_BASE_URL}/auth/refresh-token`, {
 				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ refreshToken })
+				body: JSON.stringify({ refreshToken }),
+				headers: {
+					'Content-Type': 'application/json',
+					Authorization: `Bearer ${accessToken}`
+				}
 			})
-			return response.json()
+
+			const data = await response.json()
+
+			return data.data
 		}
 	}
 })
@@ -342,15 +337,18 @@ interface TokenManagerOptions {
 	isAccessTokenExpired?: (token: string) => boolean
 	isRefreshTokenExpired?: (token: string) => boolean
 
-	executeRefreshToken: (refreshToken: string) => Promise<{ accessToken: string; refreshToken: string }>
+	executeRefreshToken: (currentToken: {
+		accessToken: string
+		refreshToken: string
+	}) => Promise<{ accessToken: string; refreshToken: string }>
 	onTokenInvalid?: (error: any) => void
-	onRefreshTokenStart?: () => void
-	onRefreshTokenSuccess?: (token: { accessToken: string; refreshToken: string }) => void
+	onBeforeRefreshToken?: (currentToken: { accessToken: string; refreshToken: string }) => void
+	onAfterRefreshToken?: (newToken: { accessToken: string; refreshToken: string }) => void
 	onRefreshTokenError?: (error: any) => void
 	onRefreshTokenExpired?: (error: any) => void
 
 	tokenKey?: { accessToken: string; refreshToken: string }
-	expiryThreshold?: number
+	expiryThreshold?: number // milliseconds
 }
 ```
 

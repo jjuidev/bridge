@@ -38,13 +38,7 @@ export class EventEmitter<T extends string = string> {
 		})
 	}
 
-	public destroy() {
-		// this.events = {}
-
-		Object.keys(this.events).forEach((eventName) => {
-			this.events[eventName as T].forEach((handler) => {
-				this.off(eventName as T, handler)
-			})
-		})
+	public cleanup() {
+		this.events = {}
 	}
 }

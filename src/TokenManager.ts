@@ -28,15 +28,15 @@ export interface TokenManagerOptions {
 	isAccessTokenExpired?: (token: string) => boolean
 	isRefreshTokenExpired?: (token: string) => boolean
 
-	executeRefreshToken: (refreshToken: string) => Promise<Token>
+	executeRefreshToken: (currentToken: Token) => Promise<Token>
 	onTokenInvalid?: (error: any) => void
 	onRefreshTokenStart?: () => void
-	onRefreshTokenSuccess?: (token: Token) => void
+	onRefreshTokenSuccess?: (newToken: Token) => void
 	onRefreshTokenError?: (error: any) => void
 	onRefreshTokenExpired?: (error: any) => void
 
 	tokenKey?: TokenKey
-	expiryThreshold?: number // seconds
+	expiryThreshold?: number // ms
 }
 
 export class TokenManager extends EventEmitter<RefreshTokenEvents> implements ITokenManager {
@@ -54,7 +54,7 @@ export class TokenManager extends EventEmitter<RefreshTokenEvents> implements IT
 			refreshToken: 'refreshToken',
 			...options.tokenKey
 		}
-		this.expiryThreshold = options.expiryThreshold ?? 60
+		this.expiryThreshold = options.expiryThreshold ?? 60_000
 
 		this.setupEventListener()
 	}
@@ -71,9 +71,7 @@ export class TokenManager extends EventEmitter<RefreshTokenEvents> implements IT
 				return false
 			}
 
-			const currentTime = Math.floor(Date.now() / 1_000)
-
-			return decoded.exp < currentTime + this.expiryThreshold
+			return decoded.exp * 1_000 < Date.now() + this.expiryThreshold
 		} catch (error) {
 			this.emit('token:invalid', error)
 			throw error
@@ -151,10 +149,14 @@ export class TokenManager extends EventEmitter<RefreshTokenEvents> implements IT
 
 		this.refreshPromise = (async () => {
 			try {
-				const refreshToken = this.getRefreshToken()
-				const token = await this.options.executeRefreshToken(refreshToken)
+				const currentToken = {
+					accessToken: this.getAccessToken(),
+					refreshToken: this.getRefreshToken()
+				}
 
-				if (!token?.accessToken || !token?.refreshToken) {
+				const newToken = await this.options.executeRefreshToken(currentToken)
+
+				if (!newToken?.accessToken || !newToken?.refreshToken) {
 					const error = new Error('Invalid token returned from executeRefreshToken')
 
 					this.emit('refreshToken:error', error)
@@ -162,8 +164,8 @@ export class TokenManager extends EventEmitter<RefreshTokenEvents> implements IT
 				}
 
 				this.emit('refreshToken:success', {
-					accessToken: token.accessToken,
-					refreshToken: token.refreshToken
+					accessToken: newToken.accessToken,
+					refreshToken: newToken.refreshToken
 				})
 			} catch (error) {
 				this.emit('refreshToken:error', error)
@@ -192,12 +194,12 @@ export class TokenManager extends EventEmitter<RefreshTokenEvents> implements IT
 			}
 		}
 
-		const handleRefreshTokenSuccess = (token: Token) => {
+		const handleRefreshTokenSuccess = (newToken: Token) => {
 			if (this.options.onRefreshTokenSuccess) {
-				this.options.onRefreshTokenSuccess(token)
+				this.options.onRefreshTokenSuccess(newToken)
 			} else {
-				localStorage.setItem(this.tokenKey.accessToken, token.accessToken)
-				localStorage.setItem(this.tokenKey.refreshToken, token.refreshToken)
+				localStorage.setItem(this.tokenKey.accessToken, newToken.accessToken)
+				localStorage.setItem(this.tokenKey.refreshToken, newToken.refreshToken)
 			}
 		}
 
