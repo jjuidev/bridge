@@ -1,6 +1,6 @@
 {
   "name": "@jjuidev/bridge",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "A modern TypeScript HTTP client with token management and interceptors",
   "license": "MIT",
   "author": "jjuidev <hi@jjuidev.com>",
