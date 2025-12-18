@@ -154,6 +154,13 @@ export class TokenManager extends EventEmitter<RefreshTokenEvents> implements IT
 				const refreshToken = this.getRefreshToken()
 				const token = await this.options.executeRefreshToken(refreshToken)
 
+				if (!token?.accessToken || !token?.refreshToken) {
+					const error = new Error('Invalid token returned from executeRefreshToken')
+
+					this.emit('refreshToken:error', error)
+					throw error
+				}
+
 				this.emit('refreshToken:success', {
 					accessToken: token.accessToken,
 					refreshToken: token.refreshToken

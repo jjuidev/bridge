@@ -6,7 +6,9 @@ import axios, {
 	InternalAxiosRequestConfig
 } from 'axios'
 
-import { TokenManager, TokenManagerOptions } from './TokenManager.js'
+import { TokenManager, TokenManagerOptions } from './TokenManager'
+
+export interface BridgeResponse<T = any, D = any, H = {}> extends AxiosResponse<T, D, H> {}
 
 export interface RequestInterceptor {
 	onRequest?: (request: InternalAxiosRequestConfig) => Promise<InternalAxiosRequestConfig> | InternalAxiosRequestConfig
@@ -14,7 +16,7 @@ export interface RequestInterceptor {
 }
 
 export interface ResponseInterceptor {
-	onResponse?: (response: AxiosResponse) => any
+	onResponse?: (response: BridgeResponse) => any
 	onResponseError?: (error: AxiosError) => Promise<never>
 }
 
@@ -24,8 +26,8 @@ export interface HttpClientOptions extends CreateAxiosDefaults {
 }
 
 export class HttpClient {
-	protected instance: ReturnType<typeof axios.create>
-	protected tokenManager: TokenManager
+	private instance: ReturnType<typeof axios.create>
+	public tokenManager: TokenManager
 
 	constructor(options: HttpClientOptions) {
 		const { ignoreTokenPatterns = [], tokenManagerOptions, ...axiosOptions } = options
@@ -75,20 +77,20 @@ export class HttpClient {
 	}
 
 	// https://github.com/axios/axios
-	public head = <T = any, R = AxiosResponse<T>, D = any>(url: string, config?: AxiosRequestConfig<D>) =>
+	public head = <T = any, R = BridgeResponse<T>, D = any>(url: string, config?: AxiosRequestConfig<D>) =>
 		this.instance.head<T, R, D>(url, config)
-	public options = <T = any, R = AxiosResponse<T>, D = any>(url: string, config?: AxiosRequestConfig<D>) =>
+	public options = <T = any, R = BridgeResponse<T>, D = any>(url: string, config?: AxiosRequestConfig<D>) =>
 		this.instance.options<T, R, D>(url, config)
-	public request = <T = any, R = AxiosResponse<T>, D = any>(config: AxiosRequestConfig<D>) =>
+	public request = <T = any, R = BridgeResponse<T>, D = any>(config: AxiosRequestConfig<D>) =>
 		this.instance.request<T, R, D>(config)
-	public get = <T = any, R = AxiosResponse<T>, D = any>(url: string, config?: AxiosRequestConfig<D>) =>
+	public get = <T = any, R = BridgeResponse<T>, D = any>(url: string, config?: AxiosRequestConfig<D>) =>
 		this.instance.get<T, R, D>(url, config)
-	public post = <T = any, R = AxiosResponse<T>, D = any>(url: string, data?: D, config?: AxiosRequestConfig<D>) =>
+	public post = <T = any, R = BridgeResponse<T>, D = any>(url: string, data?: D, config?: AxiosRequestConfig<D>) =>
 		this.instance.post<T, R, D>(url, data, config)
-	public put = <T = any, R = AxiosResponse<T>, D = any>(url: string, data?: D, config?: AxiosRequestConfig<D>) =>
+	public put = <T = any, R = BridgeResponse<T>, D = any>(url: string, data?: D, config?: AxiosRequestConfig<D>) =>
 		this.instance.put<T, R, D>(url, data, config)
-	public patch = <T = any, R = AxiosResponse<T>, D = any>(url: string, data?: D, config?: AxiosRequestConfig<D>) =>
+	public patch = <T = any, R = BridgeResponse<T>, D = any>(url: string, data?: D, config?: AxiosRequestConfig<D>) =>
 		this.instance.patch<T, R, D>(url, data, config)
-	public delete = <T = any, R = AxiosResponse<T>, D = any>(url: string, config?: AxiosRequestConfig<D>) =>
+	public delete = <T = any, R = BridgeResponse<T>, D = any>(url: string, config?: AxiosRequestConfig<D>) =>
 		this.instance.delete<T, R, D>(url, config)
 }
