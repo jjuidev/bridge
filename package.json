@@ -1,17 +1,39 @@
 {
   "name": "@jjuidev/bridge",
   "version": "1.0.0",
-  "description": "",
+  "description": "A modern TypeScript HTTP client with token management and interceptors",
   "license": "MIT",
-  "author": "jjuidev <jjuidev@gmail.com>",
+  "author": "jjuidev <hi@jjuidev.com>",
   "repository": "git@github.com:jjuidev/bridge.git",
-  "main": "index.js",
+  "type": "commonjs",
+  "exports": {
+    ".": {
+      "types": "./dist/main.d.ts",
+      "require": "./dist/main.js",
+      "import": "./dist/main.mjs"
+    }
+  },
+  "main": "./dist/main.js",
+  "module": "./dist/main.mjs",
+  "files": [
+    "dist"
+  ],
   "scripts": {
+    "build": "tsup src/main.ts --format cjs,esm --dts --clean",
+    "changeset": "changeset",
     "format": "eslint --fix \"src/**/*.{js,ts,jsx,tsx}\" && prettier --write \"src/**/*.{js,ts,jsx,tsx}\"",
     "prepare": "husky",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "release": "yarn build && yarn changeset publish",
+    "unpublish": "npm unpublish @jjuidev/bridge --force",
+    "version": "changeset version"
+  },
+  "types": "./dist/main.d.ts",
+  "dependencies": {
+    "axios": "^1.13.2",
+    "jwt-decode": "^4.0.0"
   },
   "devDependencies": {
+    "@changesets/cli": "^2.29.8",
     "@commitlint/cli": "^20.2.0",
     "@commitlint/config-conventional": "^20.2.0",
     "@eslint/js": "^9.39.2",
@@ -25,10 +47,23 @@
     "husky": "^9.1.7",
     "lint-staged": "^16.2.7",
     "prettier": "^3.7.4",
+    "tsup": "^8.5.1",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.50.0"
   },
-  "keywords": [],
+  "keywords": [
+    "axios",
+    "bridge",
+    "http-client",
+    "httpClient",
+    "interceptors",
+    "jwt",
+    "refresh-token",
+    "refreshToken"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
   "lint-staged": {
     "*.{js,ts,jsx,tsx}": [
       "eslint --fix",

@@ -2,10 +2,10 @@
 node_modules
 
 # package manager lockfiles
-# package-lock.json
-# yarn.lock
-# pnpm-lock.yaml
-# bun.lockb
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+bun.lockb
 
 # production
 build
@@ -39,3 +39,4 @@ Desktop.ini
 
 # typescript
 *.tsbuildinfo
+.env
