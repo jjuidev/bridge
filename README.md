@@ -4,13 +4,8 @@ Modern TypeScript HTTP client built on Axios with automatic token management, in
 
 ## Features
 
-- Axios wrapper with full TypeScript support
-- Automatic JWT token management with expiry detection
-- Event-driven architecture for token lifecycle
-- Request/Response interceptors (supports single or array)
-- Automatic token attachment to requests with ignore patterns
-- Full TypeScript types and interfaces
-- Concurrent request handling during token refresh
+- Easy to use and configure for auth refreshToken flow.
+- Default logic base on axios, localStorage and JWT token.
 
 ## Installation
 
@@ -53,9 +48,6 @@ const httpClient = new HttpClient({
 		}
 	}
 })
-
-const response = await httpClient.get('/users')
-console.log(response.data)
 ```
 
 ## Interceptors
@@ -127,24 +119,20 @@ const httpClient = new HttpClient({
 			})
 
 			const data = await response.json()
-
 			return data.data
 		}
 	}
 })
 ```
 
-### Custom Token Storage
+### Custom source of token (getAccessToken and getRefreshToken)
+
+By default, the library will get accessToken and refreshToken from localStorage. You can define your own logic to get accessToken and refreshToken from sessionStorage, cookie, etc.
 
 ```typescript
 const httpClient = new HttpClient({
 	baseURL: API_BASE_URL,
 	tokenManagerOptions: {
-		expiryThreshold: 120_000, // 120 seconds in milliseconds
-		tokenKey: {
-			accessToken: 'token_access',
-			refreshToken: 'token_refresh'
-		},
 		getAccessToken: () => sessionStorage.getItem('token_access') ?? '',
 		getRefreshToken: () => sessionStorage.getItem('token_refresh') ?? '',
 		executeRefreshToken: async ({ accessToken, refreshToken }) => {
@@ -158,14 +146,23 @@ const httpClient = new HttpClient({
 			})
 
 			const data = await response.json()
-
 			return data.data
 		}
 	}
 })
 ```
 
-### Token Lifecycle Callbacks
+### Token events callbacks
+
+By default, the library will `set|clear` token `to|from` `localStorage` for the token events. You can define your own logic to handle the token events.
+
+| Token event            | Default behavior |
+| ---------------------- | ---------------- |
+| `token:invalid`        | clear            |
+| `refreshToken:start`   | \_               |
+| `refreshToken:success` | set              |
+| `refreshToken:error`   | clear            |
+| `refreshToken:expired` | clear            |
 
 ```typescript
 const httpClient = new HttpClient({
@@ -182,37 +179,30 @@ const httpClient = new HttpClient({
 			})
 
 			const data = await response.json()
-
 			return data.data
 		},
 		onTokenInvalid: (error) => {
-			console.error('Token invalid:', error)
 			// Handle invalid token (e.g., redirect to login)
-			localStorage.clear()
 		},
-		onBeforeRefreshToken: (currentToken) => {
-			console.log('Starting token refresh with current token:', currentToken)
+		onRefreshTokenStart: () => {
+			// Handle refresh token start if necessary
 		},
-		onAfterRefreshToken: (newToken) => {
-			console.log('Token refreshed:', newToken)
-			// Token is automatically saved to localStorage
-			// Or handle custom storage here
+		onRefreshTokenSuccess: (newToken) => {
+			// Handle refresh token (e.g., update token in localStorage)
 		},
 		onRefreshTokenError: (error) => {
-			console.error('Refresh failed:', error)
-			// Handle refresh error
+			// Handle refresh error (e.g., redirect to login)
 		},
 		onRefreshTokenExpired: (error) => {
-			console.error('Refresh token expired:', error)
-			// Handle expired refresh token (e.g., logout)
-			localStorage.clear()
-			window.location.href = '/login'
+			// Handle expired refresh token (e.g., redirect to login)
 		}
 	}
 })
 ```
 
-### Custom Token Validation
+### Custom token validation (isAccessTokenExpired and isRefreshTokenExpired)
+
+By default, the library will use JWT decode to check token `exp` with `expiryThreshold` (1 minute by default). You can define your own logic to check if access token or refresh token is expired.
 
 ```typescript
 const httpClient = new HttpClient({
@@ -239,7 +229,6 @@ const httpClient = new HttpClient({
 			})
 
 			const data = await response.json()
-
 			return data.data
 		}
 	}
@@ -248,7 +237,7 @@ const httpClient = new HttpClient({
 
 ## Ignore Token Patterns
 
-By default, token is automatically attached to all requests. Use `ignoreTokenPatterns` to skip token attachment for specific routes (e.g., public endpoints, login, register):
+By default, token is automatically attached to all requests. Use `ignoreTokenPatterns` to skip token attachment for specific routes (e.g., public endpoints, login, register)
 
 ```typescript
 const httpClient = new HttpClient({
@@ -266,32 +255,27 @@ const httpClient = new HttpClient({
 			})
 
 			const data = await response.json()
-
 			return data.data
 		}
 	}
 })
-
-await httpClient.post('/auth/login', { email, password })
-
-await httpClient.get('/public/articles')
 ```
 
-## Custom Auth Injection
+## Custom auth injection (injectAuth)
 
-By default, token is automatically injected as `Authorization: Bearer ${token}` header. Use `injectAuth` to customize how the token is attached to requests.
+By default, token is automatically injected as `Authorization: Bearer ${token}` header. Use `injectAuth` to customize how the token is attached to requests (header name, format, query params, etc.)
 
 ### Default Behavior (Bearer Token)
 
 ```typescript
 const httpClient = new HttpClient({
 	baseURL: API_BASE_URL,
+	// Default: request.headers['Authorization'] = `Bearer ${token}`
 	tokenManagerOptions: {
 		executeRefreshToken: async ({ accessToken, refreshToken }) => {
 			// ... refresh logic
 		}
 	}
-	// Default: request.headers['Authorization'] = `Bearer ${token}`
 })
 ```
 
@@ -300,46 +284,19 @@ const httpClient = new HttpClient({
 ```typescript
 const httpClient = new HttpClient({
 	baseURL: API_BASE_URL,
-	tokenManagerOptions: {
-		executeRefreshToken: async ({ accessToken, refreshToken }) => {
-			// ... refresh logic
-		}
-	},
 	injectAuth: (token, request) => {
-		// Use custom auth type
+		// Custom auth type, example: X-Auth-Token
 		request.headers['X-Auth-Token'] = token
-		// ...
-	}
-})
-```
-
-### Custom Token Format
-
-```typescript
-const httpClient = new HttpClient({
-	baseURL: API_BASE_URL,
+	},
 	tokenManagerOptions: {
 		executeRefreshToken: async ({ accessToken, refreshToken }) => {
 			// ... refresh logic
 		}
-	},
-	injectAuth: (token, request) => {
-		// Custom format: không dùng Bearer prefix
-		request.headers['Authorization'] = `Token ${token}`
 	}
 })
 ```
 
 ## Token Refresh Flow
-
-The library automatically handles token refresh with the following flow:
-
-1. **Request Interceptor**: Before each request, checks if access token is valid
-2. **Token Validation**: Uses JWT decode to check token expiry with threshold (or custom validation)
-3. **Automatic Refresh**: If token expired, automatically refreshes using refresh token
-4. **Concurrent Handling**: Multiple requests during refresh wait for single refresh operation (single-flight pattern)
-5. **Event Emission**: Emits events throughout the refresh lifecycle
-6. **Error Handling**: Handles invalid refresh tokens and network errors
 
 ```
 // Flow refreshToken by Event-Driven Architecture
@@ -360,63 +317,15 @@ Request → getToken() → isAccessTokenExpired()? → No Token/Invalid? → Emi
                                                     getAccessToken() - (after onRefreshTokenSuccess)
 ```
 
-### Event Flow
+### Token refresh flow events
 
-- **`token:invalid`**: Emitted when token is missing, invalid, or cannot be decoded
-- **`refreshToken:start`**: Emitted when refresh process begins
-- **`refreshToken:success`**: Emitted when refresh succeeds (includes new token object)
-- **`refreshToken:error`**: Emitted when refresh API call fails
-- **`refreshToken:expired`**: Emitted when refresh token itself is expired or invalid
-
-## Configuration Options
-
-### HttpClientOptions
-
-```typescript
-interface HttpClientOptions extends CreateAxiosDefaults {
-	ignoreTokenPatterns?: RegExp[]
-	tokenManagerOptions: TokenManagerOptions
-	injectAuth?: (token: string, request: InternalAxiosRequestConfig) => void
-}
-```
-
-**Note:**
-
-- Token is automatically attached to all requests by default as `Authorization: Bearer ${token}` header
-- Use `ignoreTokenPatterns` to skip token attachment for specific endpoints (e.g., public routes, login, register)
-- Use `injectAuth` to customize how the token is injected into requests (header name, format, query params, etc.)
-
-### TokenManagerOptions
-
-```typescript
-interface TokenManagerOptions {
-	getAccessToken?: () => string
-	getRefreshToken?: () => string
-	isAccessTokenExpired?: (token: string) => boolean
-	isRefreshTokenExpired?: (token: string) => boolean
-
-	executeRefreshToken: (currentToken: {
-		accessToken: string
-		refreshToken: string
-	}) => Promise<{ accessToken: string; refreshToken: string }>
-	onTokenInvalid?: (error: any) => void
-	onBeforeRefreshToken?: (currentToken: { accessToken: string; refreshToken: string }) => void
-	onAfterRefreshToken?: (newToken: { accessToken: string; refreshToken: string }) => void
-	onRefreshTokenError?: (error: any) => void
-	onRefreshTokenExpired?: (error: any) => void
-
-	tokenKey?: { accessToken: string; refreshToken: string }
-	expiryThreshold?: number // milliseconds
-}
-```
-
-## Events
-
-- `token:invalid` - Token is invalid or missing (emits error)
-- `refreshToken:start` - Token refresh started
-- `refreshToken:success` - Token refresh completed successfully (emits token object)
-- `refreshToken:error` - Token refresh failed (emits error)
-- `refreshToken:expired` - Refresh token is invalid or expired (emits error)
+| Token event            | Description                                                        |
+| ---------------------- | ------------------------------------------------------------------ |
+| `token:invalid`        | Emitted when token is `missing`, `invalid`, or `cannot be decoded` |
+| `refreshToken:start`   | Emitted when refresh process begins                                |
+| `refreshToken:success` | Emitted when refresh succeeds (includes new token object)          |
+| `refreshToken:error`   | Emitted when refresh API call fails                                |
+| `refreshToken:expired` | Emitted when refreshToken is `expired`                             |
 
 ## Author
 

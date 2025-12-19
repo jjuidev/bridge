@@ -2,10 +2,6 @@ import { jwtDecode } from 'jwt-decode'
 
 import { EventEmitter } from './EventEmitter'
 
-export type TokenKey = {
-	accessToken: string
-	refreshToken: string
-}
 export type Token = {
 	accessToken: string
 	refreshToken: string
@@ -34,8 +30,6 @@ export interface TokenManagerOptions {
 	onRefreshTokenSuccess?: (newToken: Token) => void
 	onRefreshTokenError?: (error: any) => void
 	onRefreshTokenExpired?: (error: any) => void
-
-	tokenKey?: TokenKey
 	expiryThreshold?: number // ms
 }
 
@@ -43,24 +37,20 @@ export class TokenManager extends EventEmitter<RefreshTokenEvents> implements IT
 	private isRefreshing = false
 	private refreshPromise: Promise<void> | null = null
 
-	private readonly _tokenKey: TokenKey
-	private readonly expiryThreshold: number
+	private readonly tokenKey = {
+		accessToken: 'accessToken',
+		refreshToken: 'refreshToken'
+	}
+	private expiryThreshold: number = 60_000 // milliseconds
 
 	constructor(private readonly options: TokenManagerOptions) {
 		super()
 
-		this._tokenKey = {
-			accessToken: 'accessToken',
-			refreshToken: 'refreshToken',
-			...options.tokenKey
+		if (options.expiryThreshold) {
+			this.expiryThreshold = options.expiryThreshold
 		}
-		this.expiryThreshold = options.expiryThreshold ?? 60_000
 
-		this.setupEventListener()
-	}
-
-	get tokenKey(): TokenKey {
-		return this._tokenKey
+		this.addEventListener()
 	}
 
 	private isTokenExpired(token: string): boolean {
@@ -78,21 +68,41 @@ export class TokenManager extends EventEmitter<RefreshTokenEvents> implements IT
 		}
 	}
 
-	public getAccessToken(): string {
-		if (this.options.getAccessToken) {
-			return this.options.getAccessToken()
-		}
-
+	private getTokenFromStorage(): Token {
 		const accessToken = localStorage.getItem(this.tokenKey.accessToken)
+		const refreshToken = localStorage.getItem(this.tokenKey.refreshToken)
 
-		if (!accessToken) {
-			const error = new Error('No access token available')
+		if (!accessToken || !refreshToken) {
+			const error = new Error('No access or refresh token available')
 
 			this.emit('token:invalid', error)
 			throw error
 		}
 
-		return accessToken
+		return {
+			accessToken,
+			refreshToken
+		}
+	}
+
+	private setTokenToStorage(token: Token) {
+		Object.entries(token).forEach(([key, value]) => {
+			localStorage.setItem(this.tokenKey[key as 'accessToken' | 'refreshToken'], value)
+		})
+	}
+
+	private clearTokenFromStorage() {
+		Object.keys(this.tokenKey).forEach((key) => {
+			localStorage.removeItem(key)
+		})
+	}
+
+	public getAccessToken(): string {
+		if (this.options.getAccessToken) {
+			return this.options.getAccessToken()
+		}
+
+		return this.getTokenFromStorage().accessToken
 	}
 
 	public getRefreshToken(): string {
@@ -100,16 +110,7 @@ export class TokenManager extends EventEmitter<RefreshTokenEvents> implements IT
 			return this.options.getRefreshToken()
 		}
 
-		const refreshToken = localStorage.getItem(this.tokenKey.refreshToken)
-
-		if (!refreshToken) {
-			const error = new Error('No refresh token available')
-
-			this.emit('token:invalid', error)
-			throw error
-		}
-
-		return refreshToken
+		return this.getTokenFromStorage().refreshToken
 	}
 
 	public isAccessTokenExpired(): boolean {
@@ -179,12 +180,12 @@ export class TokenManager extends EventEmitter<RefreshTokenEvents> implements IT
 		return this.refreshPromise
 	}
 
-	private setupEventListener() {
+	private addEventListener() {
 		const handleTokenInvalid = (error: any) => {
 			if (this.options.onTokenInvalid) {
 				this.options.onTokenInvalid(error)
 			} else {
-				localStorage.clear()
+				this.clearTokenFromStorage()
 			}
 		}
 
@@ -198,8 +199,7 @@ export class TokenManager extends EventEmitter<RefreshTokenEvents> implements IT
 			if (this.options.onRefreshTokenSuccess) {
 				this.options.onRefreshTokenSuccess(newToken)
 			} else {
-				localStorage.setItem(this.tokenKey.accessToken, newToken.accessToken)
-				localStorage.setItem(this.tokenKey.refreshToken, newToken.refreshToken)
+				this.setTokenToStorage(newToken)
 			}
 		}
 
@@ -207,7 +207,7 @@ export class TokenManager extends EventEmitter<RefreshTokenEvents> implements IT
 			if (this.options.onRefreshTokenError) {
 				this.options.onRefreshTokenError(error)
 			} else {
-				localStorage.clear()
+				this.clearTokenFromStorage()
 			}
 		}
 
@@ -215,7 +215,7 @@ export class TokenManager extends EventEmitter<RefreshTokenEvents> implements IT
 			if (this.options.onRefreshTokenExpired) {
 				this.options.onRefreshTokenExpired(error)
 			} else {
-				localStorage.clear()
+				this.clearTokenFromStorage()
 			}
 		}
 
