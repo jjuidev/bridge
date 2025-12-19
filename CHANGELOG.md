@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.1.0
+
+### Minor Changes
+
+- b85c3d9: Add injectAuth method
+- 4053bb7: Change expiryThreshold, executeRefreshToken
+
 ## 2.0.0
 
 ### Major Changes
