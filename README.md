@@ -277,6 +277,59 @@ await httpClient.post('/auth/login', { email, password })
 await httpClient.get('/public/articles')
 ```
 
+## Custom Auth Injection
+
+By default, token is automatically injected as `Authorization: Bearer ${token}` header. Use `injectAuth` to customize how the token is attached to requests.
+
+### Default Behavior (Bearer Token)
+
+```typescript
+const httpClient = new HttpClient({
+	baseURL: API_BASE_URL,
+	tokenManagerOptions: {
+		executeRefreshToken: async ({ accessToken, refreshToken }) => {
+			// ... refresh logic
+		}
+	}
+	// Default: request.headers['Authorization'] = `Bearer ${token}`
+})
+```
+
+### Custom Auth Type
+
+```typescript
+const httpClient = new HttpClient({
+	baseURL: API_BASE_URL,
+	tokenManagerOptions: {
+		executeRefreshToken: async ({ accessToken, refreshToken }) => {
+			// ... refresh logic
+		}
+	},
+	injectAuth: (token, request) => {
+		// Use custom auth type
+		request.headers['X-Auth-Token'] = token
+		// ...
+	}
+})
+```
+
+### Custom Token Format
+
+```typescript
+const httpClient = new HttpClient({
+	baseURL: API_BASE_URL,
+	tokenManagerOptions: {
+		executeRefreshToken: async ({ accessToken, refreshToken }) => {
+			// ... refresh logic
+		}
+	},
+	injectAuth: (token, request) => {
+		// Custom format: không dùng Bearer prefix
+		request.headers['Authorization'] = `Token ${token}`
+	}
+})
+```
+
 ## Token Refresh Flow
 
 The library automatically handles token refresh with the following flow:
@@ -323,10 +376,15 @@ Request → getToken() → isAccessTokenExpired()? → No Token/Invalid? → Emi
 interface HttpClientOptions extends CreateAxiosDefaults {
 	ignoreTokenPatterns?: RegExp[]
 	tokenManagerOptions: TokenManagerOptions
+	injectAuth?: (token: string, request: InternalAxiosRequestConfig) => void
 }
 ```
 
-**Note:** Token is automatically attached to all requests by default. Use `ignoreTokenPatterns` to skip token attachment for specific endpoints (e.g., public routes, login, register).
+**Note:**
+
+- Token is automatically attached to all requests by default as `Authorization: Bearer ${token}` header
+- Use `ignoreTokenPatterns` to skip token attachment for specific endpoints (e.g., public routes, login, register)
+- Use `injectAuth` to customize how the token is injected into requests (header name, format, query params, etc.)
 
 ### TokenManagerOptions
 

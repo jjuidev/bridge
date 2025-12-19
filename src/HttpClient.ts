@@ -23,6 +23,7 @@ export interface ResponseInterceptor {
 export interface HttpClientOptions extends CreateAxiosDefaults {
 	ignoreTokenPatterns?: RegExp[]
 	tokenManagerOptions: TokenManagerOptions
+	injectAuth?: (token: string, request: InternalAxiosRequestConfig) => void
 }
 
 export class HttpClient {
@@ -30,7 +31,7 @@ export class HttpClient {
 	public tokenManager: TokenManager
 
 	constructor(options: HttpClientOptions) {
-		const { ignoreTokenPatterns = [], tokenManagerOptions, ...axiosOptions } = options
+		const { ignoreTokenPatterns = [], tokenManagerOptions, injectAuth, ...axiosOptions } = options
 
 		this.instance = axios.create(axiosOptions)
 		this.tokenManager = new TokenManager(tokenManagerOptions)
@@ -44,7 +45,11 @@ export class HttpClient {
 				const token = await this.tokenManager.getToken()
 
 				if (token) {
-					request.headers['Authorization'] = `Bearer ${token}`
+					if (injectAuth) {
+						injectAuth(token, request)
+					} else {
+						request.headers['Authorization'] = `Bearer ${token}`
+					}
 				}
 
 				return request
