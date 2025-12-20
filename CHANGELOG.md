@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.2.1
+
+### Patch Changes
+
+- 7e7bb03: Update features docs
+
 ## 2.2.0
 
 ### Minor Changes
