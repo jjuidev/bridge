@@ -28,7 +28,7 @@ export interface HttpClientOptions extends CreateAxiosDefaults {
 
 export class HttpClient {
 	private instance: ReturnType<typeof axios.create>
-	public tokenManager: TokenManager
+	private tokenManager: TokenManager
 
 	constructor(options: HttpClientOptions) {
 		const { ignoreTokenPatterns = [], tokenManagerOptions, injectAuth, ...axiosOptions } = options
@@ -58,23 +58,23 @@ export class HttpClient {
 	}
 
 	public useRequestInterceptor(interceptor: RequestInterceptor | RequestInterceptor[]) {
-		if (Array.isArray(interceptor)) {
-			interceptor.forEach((interceptor) => {
-				this.instance.interceptors.request.use(interceptor.onRequest, interceptor.onRequestError)
-			})
-		} else {
+		const interceptors = Array.isArray(interceptor) ? interceptor : [interceptor]
+
+		interceptors.forEach((interceptor) => {
 			this.instance.interceptors.request.use(interceptor.onRequest, interceptor.onRequestError)
-		}
+		})
 	}
 
 	public useResponseInterceptor(interceptor: ResponseInterceptor | ResponseInterceptor[]) {
-		if (Array.isArray(interceptor)) {
-			interceptor.forEach((interceptor) => {
-				this.instance.interceptors.response.use(interceptor.onResponse, interceptor.onResponseError)
-			})
-		} else {
+		const interceptors = Array.isArray(interceptor) ? interceptor : [interceptor]
+
+		interceptors.forEach((interceptor) => {
 			this.instance.interceptors.response.use(interceptor.onResponse, interceptor.onResponseError)
-		}
+		})
+	}
+
+	public cleanup() {
+		this.tokenManager.cleanup()
 	}
 
 	// https://github.com/axios/axios

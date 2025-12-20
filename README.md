@@ -1,11 +1,13 @@
 # @jjuidev/bridge
 
-Modern TypeScript HTTP client built on Axios with automatic token management, interceptors, and event-driven refresh token handling.
+Modern TypeScript HTTP client built on axios with token management. Supports event-driven refresh token flow.
 
 ## Features
 
-- Easy to use and configure for auth refreshToken flow.
-- Default logic base on axios, localStorage and JWT token.
+- Inject token to request headers.
+- Event-driven refresh token flow.
+- Default logic base on axios, localStorage and jwt-decode.
+- Easy to use and configure for authentication refresh token flow.
 
 ## Installation
 
@@ -43,7 +45,6 @@ const httpClient = new HttpClient({
 			})
 
 			const data = await response.json()
-
 			return data.data
 		}
 	}
