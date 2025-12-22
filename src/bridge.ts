@@ -250,32 +250,3 @@ export const createBridgeFactory = <TServiceFactory = Record<string, never>, TQu
 		createService
 	}
 }
-
-const API_BASE_URL = 'https://api.example.com'
-
-export const httpClient = new HttpClient({
-	baseURL: API_BASE_URL,
-	tokenManagerOptions: {
-		executeRefreshToken: async ({ accessToken, refreshToken }) => {
-			const response = await fetch(`${API_BASE_URL}/auth/refresh-token`, {
-				method: 'POST',
-				body: JSON.stringify({ refreshToken }),
-				headers: {
-					'Content-Type': 'application/json',
-					Authorization: `Bearer ${accessToken}`
-				}
-			})
-
-			const data = await response.json()
-
-			return data.data
-		}
-	}
-})
-
-export const { createQueryKey, createService } = createBridgeFactory({
-	httpClient,
-	serviceFactoryFn: ({ httpClient, buildQueryString }) => ({
-		list2: (filter?: Filter) => httpClient.get(`/users?${buildQueryString(filter)}`)
-	})
-})
