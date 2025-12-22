@@ -8,6 +8,7 @@ Modern TypeScript HTTP client built on axios with token management. Supports eve
 - Event-driven refresh token flow.
 - Default logic base on axios, localStorage and jwt-decode.
 - Easy to use and configure for authentication refresh token flow.
+- Factory for create service and query key. Ref: [Effective React Query Keys](https://tkdodo.eu/blog/effective-react-query-keys)
 
 ## Installation
 
@@ -26,6 +27,22 @@ bun add @jjuidev/bridge
 ```
 
 ## Basic Usage
+
+### ⚠️ Important: Refresh Token API Call
+
+**DO NOT use `httpClient` to call refresh token API** - This will cause an infinite loop!
+
+**Why?**
+
+```
+httpClient.post('/auth/refresh')
+  → Interceptor checks token → getToken()
+  → Token expired → refreshTokenIfNecessary()
+  → executeRefreshToken() → httpClient.post('/auth/refresh') again
+  → INFINITE LOOP! 🔄
+```
+
+**✅ Correct Approach: Use `fetch` directly**
 
 ```typescript
 import { HttpClient } from '@jjuidev/bridge'
@@ -56,6 +73,7 @@ const httpClient = new HttpClient({
 ### Single Request Interceptor
 
 ```typescript
+...
 httpClient.useRequestInterceptor({
 	onRequest: (config) => {
 		console.log('Request:', config.url)
@@ -72,6 +90,7 @@ httpClient.useRequestInterceptor({
 ### Multiple Response Interceptors
 
 ```typescript
+...
 httpClient.useResponseInterceptor([
 	{
 		onResponse: (response) => {
@@ -87,45 +106,6 @@ httpClient.useResponseInterceptor([
 ])
 ```
 
-## Token Management
-
-### ⚠️ Important: Refresh Token API Call
-
-**DO NOT use `httpClient` to call refresh token API** - This will cause an infinite loop!
-
-**Why?**
-
-```
-httpClient.post('/auth/refresh')
-  → Interceptor checks token → getToken()
-  → Token expired → refreshTokenIfNecessary()
-  → executeRefreshToken() → httpClient.post('/auth/refresh') again
-  → INFINITE LOOP! 🔄
-```
-
-**✅ Correct Approach: Use `fetch` directly**
-
-```typescript
-const httpClient = new HttpClient({
-	baseURL: API_BASE_URL,
-	tokenManagerOptions: {
-		executeRefreshToken: async ({ accessToken, refreshToken }) => {
-			const response = await fetch(`${API_BASE_URL}/auth/refresh-token`, {
-				method: 'POST',
-				body: JSON.stringify({ refreshToken }),
-				headers: {
-					'Content-Type': 'application/json',
-					Authorization: `Bearer ${accessToken}`
-				}
-			})
-
-			const data = await response.json()
-			return data.data
-		}
-	}
-})
-```
-
 ### Custom source of token (getAccessToken and getRefreshToken)
 
 By default, the library will get accessToken and refreshToken from localStorage. You can define your own logic to get accessToken and refreshToken from sessionStorage, cookie, etc.
@@ -134,21 +114,9 @@ By default, the library will get accessToken and refreshToken from localStorage.
 const httpClient = new HttpClient({
 	baseURL: API_BASE_URL,
 	tokenManagerOptions: {
+		...
 		getAccessToken: () => sessionStorage.getItem('token_access') ?? '',
-		getRefreshToken: () => sessionStorage.getItem('token_refresh') ?? '',
-		executeRefreshToken: async ({ accessToken, refreshToken }) => {
-			const response = await fetch(`${API_BASE_URL}/auth/refresh-token`, {
-				method: 'POST',
-				body: JSON.stringify({ refreshToken }),
-				headers: {
-					'Content-Type': 'application/json',
-					Authorization: `Bearer ${accessToken}`
-				}
-			})
-
-			const data = await response.json()
-			return data.data
-		}
+		getRefreshToken: () => sessionStorage.getItem('token_refresh') ?? ''
 	}
 })
 ```
@@ -169,19 +137,7 @@ By default, the library will `set|clear` token `to|from` `localStorage` for the 
 const httpClient = new HttpClient({
 	baseURL: API_BASE_URL,
 	tokenManagerOptions: {
-		executeRefreshToken: async ({ accessToken, refreshToken }) => {
-			const response = await fetch(`${API_BASE_URL}/auth/refresh-token`, {
-				method: 'POST',
-				body: JSON.stringify({ refreshToken }),
-				headers: {
-					'Content-Type': 'application/json',
-					Authorization: `Bearer ${accessToken}`
-				}
-			})
-
-			const data = await response.json()
-			return data.data
-		},
+		...
 		onTokenInvalid: (error) => {
 			// Handle invalid token (e.g., redirect to login)
 		},
@@ -209,6 +165,7 @@ By default, the library will use JWT decode to check token `exp` with `expiryThr
 const httpClient = new HttpClient({
 	baseURL: API_BASE_URL,
 	tokenManagerOptions: {
+		... // other tokenManagerOptions
 		isAccessTokenExpired: (token) => {
 			// Custom logic to check if access token is expired
 			// Return true if expired, false if valid
@@ -218,19 +175,6 @@ const httpClient = new HttpClient({
 			// Custom logic to check if refresh token is expired
 			// Return true if expired, false if valid
 			return false
-		},
-		executeRefreshToken: async ({ accessToken, refreshToken }) => {
-			const response = await fetch(`${API_BASE_URL}/auth/refresh-token`, {
-				method: 'POST',
-				body: JSON.stringify({ refreshToken }),
-				headers: {
-					'Content-Type': 'application/json',
-					Authorization: `Bearer ${accessToken}`
-				}
-			})
-
-			const data = await response.json()
-			return data.data
 		}
 	}
 })
@@ -245,19 +189,7 @@ const httpClient = new HttpClient({
 	baseURL: API_BASE_URL,
 	ignoreTokenPatterns: [/\/auth\/login/, /\/auth\/register/, /\/public\//],
 	tokenManagerOptions: {
-		executeRefreshToken: async ({ accessToken, refreshToken }) => {
-			const response = await fetch(`${API_BASE_URL}/auth/refresh-token`, {
-				method: 'POST',
-				body: JSON.stringify({ refreshToken }),
-				headers: {
-					'Content-Type': 'application/json',
-					Authorization: `Bearer ${accessToken}`
-				}
-			})
-
-			const data = await response.json()
-			return data.data
-		}
+		...
 	}
 })
 ```
@@ -270,29 +202,19 @@ By default, token is automatically injected as `Authorization: Bearer ${token}` 
 
 ```typescript
 const httpClient = new HttpClient({
-	baseURL: API_BASE_URL,
-	// Default: request.headers['Authorization'] = `Bearer ${token}`
-	tokenManagerOptions: {
-		executeRefreshToken: async ({ accessToken, refreshToken }) => {
-			// ... refresh logic
-		}
-	}
+        ...
+        // Default: request.headers['Authorization'] = `Bearer ${token}`
 })
 ```
 
-### Custom Auth Type
+### Custom Auth
 
 ```typescript
 const httpClient = new HttpClient({
-	baseURL: API_BASE_URL,
+	...
 	injectAuth: (token, request) => {
 		// Custom auth type, example: X-Auth-Token
 		request.headers['X-Auth-Token'] = token
-	},
-	tokenManagerOptions: {
-		executeRefreshToken: async ({ accessToken, refreshToken }) => {
-			// ... refresh logic
-		}
 	}
 })
 ```
@@ -327,6 +249,84 @@ Request → getToken() → isAccessTokenExpired()? → No Token/Invalid? → Emi
 | `refreshToken:success` | Emitted when refresh succeeds (includes new token object)          |
 | `refreshToken:error`   | Emitted when refresh API call fails                                |
 | `refreshToken:expired` | Emitted when refreshToken is `expired`                             |
+
+# Bridge - React Query Integration
+
+## Basic Usage
+
+```typescript
+...
+const { createQueryKey, createService } = createBridgeFactory({
+  httpClient
+})
+
+const usersService = createService('users') // Use default Factory service: list, infinityList, detail, create, update, delete, remove, restore
+const usersQueryKey = createQueryKey('users') // Use default Factory queryKey: all, list, infinityList, detail
+```
+
+## Custom Factory Service
+
+```typescript
+...
+const { createService } = createBridgeFactory({
+  httpClient,
+  serviceFactoryFn: ({ httpClient, buildQueryString }) => ({
+    	list2: (filter?: Filter) => httpClient.get(`/users?${buildQueryString(filter)}`)
+  })
+})
+
+const usersService = createService('users')
+usersService.list2()
+```
+
+## Custom Factory Service with extend
+
+```typescript
+...
+const { createService } = createBridgeFactory({
+  httpClient,
+  serviceFactoryFn: ({ httpClient, buildQueryString }) => ({
+    	list2: (filter?: Filter) => httpClient.get(`/users?${buildQueryString(filter)}`)
+  })
+})
+
+const usersService = createService('users', ({ httpClient, buildQueryString }) => ({
+    	list3: (filter?: Filter) => httpClient.get(`/users?${buildQueryString(filter)}`)
+}))
+usersService.list2()
+usersService.list3()
+```
+
+## Custom Factory Query Key
+
+```typescript
+...
+const { createQueryKey } = createBridgeFactory({
+  httpClient,
+  queryKeyFactoryFn: ({ buildQueryKey }) => ({
+    	list2: (filter?: Filter) => buildQueryKey(filter)
+  })
+})
+const usersQueryKey = createQueryKey('users')
+usersQueryKey.list2()
+```
+
+## Custom Factory Query Key with extend
+
+```typescript
+...
+const { createQueryKey } = createBridgeFactory({
+  httpClient,
+  queryKeyFactoryFn: ({ buildQueryKey }) => ({
+    	list2: (filter?: Filter) => buildQueryKey(filter)
+  })
+})
+const usersQueryKey = createQueryKey('users', ({ buildQueryKey }) => ({
+    	list3: (filter?: Filter) => buildQueryKey(filter)
+}))
+usersQueryKey.list2()
+usersQueryKey.list3()
+```
 
 ## Author
 

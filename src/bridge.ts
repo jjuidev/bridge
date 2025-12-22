@@ -1,81 +1,249 @@
-import queryString from 'query-string'
+import queryString, { StringifyOptions } from 'query-string'
 
-import { HttpClient } from './HttpClient'
+import { BridgeResponse, HttpClient } from './HttpClient'
 
-//
-//
-export type Id = string | number
+export type Id = string
 export type Filter = Record<string, any>
+export type QueryKey = readonly unknown[]
 
-export interface DefaultService<T> {
-	list: (filter: Filter) => Promise<T>
-	infinityList: (filter: Filter) => Promise<T>
-	detail: (id: Id) => Promise<T>
-	create: (data: any) => Promise<T>
-	update: ({ id, data }: { id: Id; data: any }) => Promise<T>
-	delete: (id: Id) => Promise<T>
-	remove: (id: Id) => Promise<T>
-	restore: (id: Id) => Promise<T>
+export interface DefaultService {
+	list: <T = any>(filter?: Filter) => Promise<BridgeResponse<T>>
+	infinityList: <T = any>(filter?: Filter) => Promise<BridgeResponse<T>>
+	detail: <T = any>(id: Id) => Promise<BridgeResponse<T>>
+	create: <T = any, D = any>(data: D) => Promise<BridgeResponse<T>>
+	update: <T = any, D = any>(params: { id: Id; data: D }) => Promise<BridgeResponse<T>>
+	delete: (id: Id) => Promise<BridgeResponse<any>>
+	remove: (id: Id) => Promise<BridgeResponse<any>>
+	restore: (id: Id) => Promise<BridgeResponse<any>>
 }
-//
 
-export interface BridgeFactoryOptions {
+export interface ServiceUtils {
 	httpClient: HttpClient
-	qsStrategy?: (qs: Record<string, any>) => string
-	queryKeyFactoryFn?: (service: string) => string // Nếu không cung cấp thì dùng default
-	serviceFactoryFn?: () => any // Nếu không cung cấp thì dùng default
+	buildQueryString: (filter?: Filter) => string
 }
 
-export interface BridgeFactory {
-	createQueryKey: (key: string) => string
-	createService: (
+export interface DefaultQueryKey {
+	list: (filter?: Filter) => QueryKey
+	infinityList: (filter?: Filter) => QueryKey
+	detail: (id?: Id) => QueryKey
+}
+
+export interface QueryKeyUtils {
+	pick: (filter: Filter, keys: string[]) => Filter
+	omit: (filter: Filter, keys: string[]) => Filter
+	buildQueryKey: (...args: unknown[]) => QueryKey
+}
+
+export interface BridgeFactoryOptions<
+	TServiceFactory = Record<string, never>,
+	TQueryKeyFactory = Record<string, never>
+> {
+	httpClient: HttpClient
+	filterOptions?: {
+		skipNull: boolean
+		skipEmptyString: boolean
+	}
+	serviceFactoryFn?: (utils: ServiceUtils) => TServiceFactory
+	queryKeyFactoryFn?: (utils: QueryKeyUtils) => TQueryKeyFactory
+}
+
+export type BaseServiceType<TServiceFactory> =
+	TServiceFactory extends Record<string, never> ? DefaultService : TServiceFactory
+
+export type QueryKeyAll = {
+	all: QueryKey
+}
+export type BaseQueryKeyType<TQueryKeyFactory> =
+	TQueryKeyFactory extends Record<string, never> ? DefaultQueryKey & QueryKeyAll : TQueryKeyFactory & QueryKeyAll
+export interface BridgeFactory<TServiceFactory = Record<string, never>, TQueryKeyFactory = Record<string, never>> {
+	createQueryKey: <TExtend = Record<string, never>>(
 		resource: string,
-		extend?: ({
-			httpClient,
-			qsStrategy
-		}: {
-			httpClient: HttpClient
-			qsStrategy: (qs: Record<string, any>) => string
-		}) => any
-	) => any // Định nghĩa type safety default và extend
+		extend?: (utils: QueryKeyUtils) => TExtend
+	) => BaseQueryKeyType<TQueryKeyFactory> & TExtend
+	createService: <TExtend = Record<string, never>>(
+		resource: string,
+		extend?: (utils: ServiceUtils) => TExtend
+	) => BaseServiceType<TServiceFactory> & TExtend
 }
 
-export const createBridgeFactory = (options: BridgeFactoryOptions): BridgeFactory => {
-	const { httpClient } = options
+export const createBridgeFactory = <TServiceFactory = Record<string, never>, TQueryKeyFactory = Record<string, never>>(
+	options: BridgeFactoryOptions<TServiceFactory, TQueryKeyFactory>
+): BridgeFactory<TServiceFactory, TQueryKeyFactory> => {
+	const { httpClient, serviceFactoryFn, queryKeyFactoryFn, filterOptions } = options
 
-	const cleanQs = (qs: Filter) => qs
+	// service
+	const buildQueryString = (filter: Filter = {}): string => {
+		const options: StringifyOptions = {
+			arrayFormat: 'none',
+			skipNull: true,
+			skipEmptyString: true,
+			...filterOptions
+		}
 
-	const normalizePath = (url: string): string => {
-		const [path, qs] = url.split('?')
-		const normalized = path?.endsWith('/') ? path : path + '/'
-
-		return qs !== undefined ? `${normalized}?${qs}` : (normalized ?? '')
+		return queryString.stringify(filter, options)
 	}
 
-	const defaultService = (resource: string): DefaultService<T> => ({
-		list: (filter) => httpClient.get(`${normalizePath(resource)}?${cleanQs(filter)}`),
-		infinityList: (filter) => httpClient.get(`${normalizePath(resource)}?${cleanQs(filter)}`),
-		detail: (id) => httpClient.get(`${normalizePath(resource)}${id}`),
-		create: (data) => httpClient.post(normalizePath(resource), data),
-		update: ({ id, data }) => httpClient.put(`${normalizePath(resource)}${id}`, data),
-		delete: (id) => httpClient.delete(`${normalizePath(resource)}${id}`),
-		remove: (id) => httpClient.delete(`${normalizePath(resource)}${id}/remove`),
-		restore: (id) => httpClient.post(`${normalizePath(resource)}${id}/restore`)
+	const serviceUtils: ServiceUtils = {
+		httpClient,
+		buildQueryString
+	}
+
+	const createDefaultService = (resource: string): DefaultService => ({
+		list: (filter) => httpClient.get(`${resource}?${buildQueryString(filter)}`),
+		infinityList: (filter) => httpClient.get(`${resource}?${buildQueryString(filter)}`),
+		detail: (id) => httpClient.get(`${resource}/${id}`),
+		create: (data) => httpClient.post(resource, data),
+		update: ({ id, data }) => httpClient.put(`${resource}/${id}`, data),
+		delete: (id) => httpClient.delete(`${resource}/${id}`),
+		remove: (id) => httpClient.delete(`${resource}/remove/${id}`),
+		restore: (id) => httpClient.post(`${resource}/restore/${id}`)
 	})
 
-	const createService = (resource: string) => {
-		console.log(1)
+	const createService = <TExtend = Record<string, never>>(
+		resource: string,
+		extend?: (utils: ServiceUtils) => TExtend
+	): BaseServiceType<TServiceFactory> & TExtend => {
+		const baseService = createDefaultService(resource)
+		const extensions = extend?.(serviceUtils) ?? ({} as TExtend)
+
+		if (serviceFactoryFn) {
+			const factoryService = serviceFactoryFn(serviceUtils)
+
+			return {
+				...factoryService,
+				...extensions
+			} as BaseServiceType<TServiceFactory> & TExtend
+		}
 
 		return {
-			...defaultService(resource),
-			...options.serviceFactoryFn?.({
-				httpClient,
-				qsStrategy: options.qsStrategy ?? ((qs: Record<string, any>) => queryString.stringify(qs))
-			})
-		}
+			...baseService,
+			...extensions
+		} as BaseServiceType<TServiceFactory> & TExtend
 	}
 
-	const createQueryKey = (key: string) => key
+	// queryKey
+	const omit = (filter: Filter = {}, keys: string[]): Filter =>
+		Object.fromEntries(Object.entries(filter).filter(([key]) => !keys.includes(key)))
+
+	const pick = (filter: Filter = {}, keys: string[]): Filter =>
+		Object.fromEntries(Object.entries(filter).filter(([key]) => keys.includes(key)))
+
+	const shouldSkipValue = (value: unknown): boolean => {
+		const options = {
+			skipNull: true,
+			skipEmptyString: true,
+			...filterOptions
+		}
+
+		if (options.skipNull && value === null) {
+			return true
+		}
+
+		if (options.skipEmptyString && value === '') {
+			return true
+		}
+
+		return false
+	}
+
+	const cleanFilter = (filter: Filter = {}): Filter =>
+		Object.entries(filter).reduce((cleanedFilter, [key, value]) => {
+			if (shouldSkipValue(value)) {
+				return cleanedFilter
+			}
+
+			if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+				cleanedFilter[key] = cleanFilter(value)
+			} else {
+				cleanedFilter[key] = value
+			}
+
+			return cleanedFilter
+		}, {} as Filter)
+
+	const buildQueryKey = (...args: unknown[]): QueryKey => {
+		const queryKey: any[] = []
+		const cleanedArgs = args.filter((arg: unknown) => arg !== undefined)
+
+		cleanedArgs.forEach((arg: unknown) => {
+			if (typeof arg === 'object' && arg !== null && !Array.isArray(arg)) {
+				queryKey.push(cleanFilter(arg))
+			} else {
+				queryKey.push(arg)
+			}
+		})
+
+		return queryKey as QueryKey
+	}
+
+	const wrapExtensions = <T extends Record<string, unknown>>(resource: string, extensions: T): T => {
+		const wrapped: Record<string, unknown> = {}
+
+		for (const [methodName, fn] of Object.entries(extensions)) {
+			if (typeof fn === 'function') {
+				wrapped[methodName] = (...args: unknown[]) => {
+					const result = fn(...args)
+
+					if (Array.isArray(result)) {
+						return [resource, methodName, ...result]
+					}
+
+					return result
+				}
+			} else {
+				wrapped[methodName] = fn
+			}
+		}
+
+		return wrapped as T
+	}
+
+	const createQueryKeyAll = (resource: string): QueryKeyAll => ({
+		all: [resource]
+	})
+
+	const queryKeyUtils: QueryKeyUtils = {
+		pick,
+		omit,
+		buildQueryKey
+	}
+
+	const createDefaultQueryKey = (resource: string): DefaultQueryKey => ({
+		...createQueryKeyAll(resource),
+		list: (filter?: Filter) => [resource, 'list', cleanFilter(filter)],
+		infinityList: (filter?: Filter) => [resource, 'infinityList', omit(filter, ['page'])],
+		detail: (id?: Id) => [resource, 'detail', id]
+	})
+
+	const createQueryKey = <TExtend = Record<string, never>>(
+		resource: string,
+		extend?: (utils: QueryKeyUtils) => TExtend
+	): BaseQueryKeyType<TQueryKeyFactory> & TExtend => {
+		const baseQueryKey = createDefaultQueryKey(resource)
+		const userExtensions = extend?.(queryKeyUtils)
+
+		const wrappedUserExtensions = userExtensions ? wrapExtensions(resource, userExtensions) : ({} as TExtend)
+
+		const extensions = {
+			...createQueryKeyAll(resource),
+			...wrappedUserExtensions
+		} as TExtend
+
+		if (queryKeyFactoryFn) {
+			const factoryQueryKey = queryKeyFactoryFn(queryKeyUtils)
+			const wrappedFactoryQueryKey = wrapExtensions(resource, factoryQueryKey as Record<string, unknown>)
+
+			return {
+				...wrappedFactoryQueryKey,
+				...extensions
+			} as BaseQueryKeyType<TQueryKeyFactory> & TExtend
+		}
+
+		return {
+			...baseQueryKey,
+			...extensions
+		} as BaseQueryKeyType<TQueryKeyFactory> & TExtend
+	}
 
 	return {
 		createQueryKey,
@@ -83,25 +251,31 @@ export const createBridgeFactory = (options: BridgeFactoryOptions): BridgeFactor
 	}
 }
 
-// Use
+const API_BASE_URL = 'https://api.example.com'
 
-const httpClient: any = {}
+export const httpClient = new HttpClient({
+	baseURL: API_BASE_URL,
+	tokenManagerOptions: {
+		executeRefreshToken: async ({ accessToken, refreshToken }) => {
+			const response = await fetch(`${API_BASE_URL}/auth/refresh-token`, {
+				method: 'POST',
+				body: JSON.stringify({ refreshToken }),
+				headers: {
+					'Content-Type': 'application/json',
+					Authorization: `Bearer ${accessToken}`
+				}
+			})
+
+			const data = await response.json()
+
+			return data.data
+		}
+	}
+})
 
 export const { createQueryKey, createService } = createBridgeFactory({
 	httpClient,
-	qsStrategy: (qs: Record<string, any>) => queryString.stringify(qs),
-	serviceFactoryFn: () => ({
-		list: () => httpClient.get('/users'),
-		create: (data: any) => httpClient.post('/users', data),
-		update: (id: string, data: any) => httpClient.put(`/users/${id}`, data),
-		delete: (id: string) => httpClient.delete(`/users/${id}`)
+	serviceFactoryFn: ({ httpClient, buildQueryString }) => ({
+		list2: (filter?: Filter) => httpClient.get(`/users?${buildQueryString(filter)}`)
 	})
 })
-
-// expect use
-export const usersService = createService('users') // Mong mốn usersService có sẵn method: list, create, update, delete
-
-export const usersServiceExtend = createService('users', ({ httpClient, qsStrategy }) => ({
-	// Mong mốn usersServiceExtend có sẵn method: infinityList
-	infinityList: (filter: Filter) => httpClient.get(`/users/infinity-list?${qsStrategy(filter)}`)
-}))
