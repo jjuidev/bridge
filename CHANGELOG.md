@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.3.0
+
+### Minor Changes
+
+- 7128dcf: Add bridge feature
+
 ## 2.2.1
 
 ### Patch Changes
