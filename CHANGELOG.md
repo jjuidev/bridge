@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.3.1
+
+### Patch Changes
+
+- 90aadcd: Remove un-use code
+
 ## 2.3.0
 
 ### Minor Changes
