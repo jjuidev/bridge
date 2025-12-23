@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.4.0
+
+### Minor Changes
+
+- 4b4a4ac: Add bridge feature
+
 ## 2.3.4
 
 ### Patch Changes
