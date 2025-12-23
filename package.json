@@ -21,6 +21,7 @@
   "scripts": {
     "build": "tsup src/main.ts --format cjs,esm --dts --clean",
     "changeset": "changeset",
+    "dev": "tsx watch src/main.ts",
     "format": "eslint --fix \"src/**/*.{js,ts,jsx,tsx}\" && prettier --write \"src/**/*.{js,ts,jsx,tsx}\"",
     "prepare": "husky",
     "release": "yarn build && yarn changeset publish",
@@ -49,6 +50,7 @@
     "lint-staged": "^16.2.7",
     "prettier": "^3.7.4",
     "tsup": "^8.5.1",
+    "tsx": "^4.21.0",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.50.0"
   },
