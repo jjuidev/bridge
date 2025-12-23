@@ -210,9 +210,9 @@ export const createBridgeFactory = <TServiceFactory = Record<string, never>, TQu
 
 	const createDefaultQueryKey = (resource: string): DefaultQueryKey => ({
 		...createQueryKeyAll(resource),
-		list: (filter?: Filter) => [resource, 'list', cleanFilter(filter)],
-		infinityList: (filter?: Filter) => [resource, 'infinityList', omit(filter, ['page'])],
-		detail: (id?: Id) => [resource, 'detail', id]
+		list: (filter?: Filter) => buildQueryKey(resource, 'list', cleanFilter(filter)),
+		infinityList: (filter?: Filter) => buildQueryKey(resource, 'infinityList', omit(filter, ['page'])),
+		detail: (id?: Id) => buildQueryKey(resource, 'detail', id)
 	})
 
 	const createQueryKey = <TExtend = Record<string, never>>(
