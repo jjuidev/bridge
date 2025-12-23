@@ -163,7 +163,12 @@ export const createBridgeFactory = <TServiceFactory = Record<string, never>, TQu
 
 	const buildQueryKey = (...args: unknown[]): QueryKey => {
 		const queryKey: any[] = []
-		const cleanedArgs = args.filter((arg: unknown) => arg !== undefined)
+
+		const cleanedArgs = args.filter(
+			(arg: unknown) =>
+				arg !== undefined ||
+				(typeof arg === 'object' && arg !== null && !Array.isArray(arg) && Object.keys(arg).length > 0)
+		)
 
 		cleanedArgs.forEach((arg: unknown) => {
 			if (typeof arg === 'object' && arg !== null && !Array.isArray(arg)) {
@@ -211,7 +216,7 @@ export const createBridgeFactory = <TServiceFactory = Record<string, never>, TQu
 	const createDefaultQueryKey = (resource: string): DefaultQueryKey => ({
 		...createQueryKeyAll(resource),
 		list: (filter?: Filter) => buildQueryKey(resource, 'list', cleanFilter(filter)),
-		infinityList: (filter?: Filter) => buildQueryKey(resource, 'infinityList', omit(filter, ['page'])),
+		infinityList: (filter?: Filter) => buildQueryKey(resource, 'infinityList', cleanFilter(omit(filter, ['page']))),
 		detail: (id?: Id) => buildQueryKey(resource, 'detail', id)
 	})
 
