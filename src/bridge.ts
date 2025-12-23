@@ -163,18 +163,7 @@ export const createBridgeFactory = <TServiceFactory = Record<string, never>, TQu
 
 	const buildQueryKey = (...args: unknown[]): QueryKey => {
 		const queryKey: any[] = []
-
-		const cleanedArgs = args.filter((arg: unknown) => {
-			if (arg === undefined) {
-				return false
-			}
-
-			if (typeof arg === 'object' && arg !== null && !Array.isArray(arg) && Object.keys(arg).length === 0) {
-				return false
-			}
-
-			return true
-		})
+		const cleanedArgs = args.filter((arg: unknown) => arg !== undefined)
 
 		cleanedArgs.forEach((arg: unknown) => {
 			if (typeof arg === 'object' && arg !== null && !Array.isArray(arg)) {
