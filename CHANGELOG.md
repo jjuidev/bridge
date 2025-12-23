@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.3.4
+
+### Patch Changes
+
+- aea1730: Fix cleanedArgs
+
 ## 2.3.3
 
 ### Patch Changes
