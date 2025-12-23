@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.3.2
+
+### Patch Changes
+
+- e2fe803: Fix default query key with buildQueryKey
+
 ## 2.3.1
 
 ### Patch Changes
