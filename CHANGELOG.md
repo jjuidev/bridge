@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.3.4
+
+### Patch Changes
+
+- 4e9e3d8: Fix buildQueryKey
+- a7fb4ae: Fix buildQueryKey
+- aea1730: Fix cleanedArgs
+
 ## 2.3.3
 
 ### Patch Changes
