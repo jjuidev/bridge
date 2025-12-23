@@ -1,0 +1,5 @@
+---
+'@jjuidev/bridge': minor
+---
+
+Release
